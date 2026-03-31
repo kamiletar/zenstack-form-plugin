@@ -1,35 +1,37 @@
 /**
- * @lena/zenstack-form-plugin
+ * @letar/zenstack-form-plugin
  *
- * ZenStack плагин для генерации Zod схем с UI метаданными из schema.zmodel
+ * ZenStack plugin for generating Zod v4 schemas with UI metadata from schema.zmodel.
  *
- * @example Конфигурация в schema.zmodel
+ * @example Configuration in schema.zmodel
  * ```zmodel
  * plugin formSchema {
- *   provider = '@lena/zenstack-form-plugin'
+ *   provider = '@letar/zenstack-form-plugin'
  *   output = './src/generated/form-schemas'
  * }
  * ```
  *
- * @example Enum с метками
+ * @example Enum with labels
  * ```zmodel
  * enum RecipeType {
- *   SWEET   // Сладкое
- *   SALTY   // Солёное
+ *   /// Sweet
+ *   SWEET
+ *   /// Salty
+ *   SALTY
  * }
  * ```
  *
- * @example Модель с @form.* директивами
+ * @example Model with @form.* directives
  * ```zmodel
  * model Product {
+ *   /// @form.title("Product name")
+ *   /// @form.placeholder("Enter name")
  *   name  String
- *         /// @form.title("Название")
- *         /// @form.placeholder("Введите название")
  *
+ *   /// @form.title("Price")
+ *   /// @form.fieldType("currency")
+ *   /// @form.props({ currency: "USD" })
  *   price Decimal
- *         /// @form.title("Цена")
- *         /// @form.fieldType("currency")
- *         /// @form.props({ currency: "RUB" })
  * }
  * ```
  */
@@ -38,7 +40,7 @@ import type { CliGeneratorContext, CliPlugin } from '@zenstackhq/sdk'
 import { generate } from './generator.js'
 
 /**
- * ZenStack CLI плагин для генерации form-схем
+ * ZenStack CLI plugin for generating form schemas.
  */
 const plugin: CliPlugin = {
   name: 'FormSchema',
@@ -51,5 +53,12 @@ const plugin: CliPlugin = {
 
 export default plugin
 
-// Реэкспорт типов для удобства
-export type { EnumInfo, EnumValueInfo, FormFieldMeta, ModelFieldInfo, ModelInfo } from './types.js'
+// Re-export types for convenience
+export type {
+  EnumInfo,
+  EnumValueInfo,
+  FormFieldMeta,
+  ModelFieldInfo,
+  ModelInfo,
+  ValidationTranslations,
+} from './types.js'

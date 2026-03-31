@@ -1,6 +1,6 @@
 /**
- * Zod constraints, извлечённые из @form.props
- * Эти значения станут методами Zod схемы (.min(), .max(), etc.)
+ * Zod constraints extracted from @form.props.
+ * These values become Zod schema methods (.min(), .max(), etc.)
  */
 export interface ZodConstraints {
   // Number constraints
@@ -19,127 +19,129 @@ export interface ZodConstraints {
 }
 
 /**
- * Метаданные поля формы, извлечённые из @form.* директив
+ * Form field metadata extracted from @form.* directives.
  */
 export interface FormFieldMeta {
-  /** Заголовок поля */
+  /** Field label */
   title?: string
-  /** Placeholder */
+  /** Placeholder text */
   placeholder?: string
-  /** Описание/подсказка */
+  /** Helper text / description */
   description?: string
-  /** Тип UI компонента */
+  /** UI component type */
   fieldType?: string
-  /** Zod constraints (min, max, minLength, etc.) — станут методами схемы */
+  /** Zod constraints (min, max, minLength, etc.) — become schema methods */
   constraints?: ZodConstraints
-  /** UI props (остальные — передаются в fieldProps) */
+  /** UI props (everything else — passed to fieldProps) */
   props?: Record<string, unknown>
-  /** Конфигурация relation */
+  /** Relation configuration */
   relation?: { model?: string; labelField: string }
-  /** Исключить поле из формы */
+  /** Exclude field from form */
   exclude?: boolean
 }
 
 /**
- * Информация об enum значении с меткой
+ * Enum value with a human-readable label.
  */
 export interface EnumValueInfo {
-  /** Имя значения (SWEET, SALTY, etc.) */
+  /** Value name (SWEET, SALTY, etc.) */
   name: string
-  /** Человекочитаемая метка */
+  /** Human-readable label */
   label: string
 }
 
 /**
- * Информация об enum
+ * Enum information.
  */
 export interface EnumInfo {
-  /** Имя enum */
+  /** Enum name */
   name: string
-  /** Значения с метками */
+  /** Values with labels */
   values: EnumValueInfo[]
 }
 
 /**
- * Информация о поле модели
+ * Model field information.
  */
 export interface ModelFieldInfo {
-  /** Имя поля */
+  /** Field name */
   name: string
-  /** Prisma тип */
+  /** Prisma type */
   type: string
-  /** Является ли обязательным */
+  /** Whether the field is required */
   isRequired: boolean
-  /** Является ли массивом */
+  /** Whether the field is an array */
   isList: boolean
-  /** Является ли enum */
+  /** Whether the field is an enum */
   isEnum: boolean
-  /** Имя enum (если isEnum) */
+  /** Enum name (if isEnum) */
   enumName?: string
-  /** Значение по умолчанию */
+  /** Default value */
   defaultValue?: unknown
-  /** Метаданные формы */
+  /** Form metadata */
   formMeta: FormFieldMeta
 }
 
 /**
- * Информация о модели
+ * Model information.
  */
 export interface ModelInfo {
-  /** Имя модели */
+  /** Model name */
   name: string
-  /** Поля модели */
+  /** Model fields */
   fields: ModelFieldInfo[]
-  /** Исключённые поля */
+  /** Excluded field names */
   excludedFields: string[]
 }
 
 /**
- * Опции генерации
+ * Generator options.
  */
 export interface GeneratorOptions {
-  /** Путь вывода */
+  /** Output path */
   output: string
-  /** Путь к схеме */
+  /** Schema file path */
   schemaPath: string
 }
 
 /**
- * Конфигурация i18n
+ * i18n configuration.
  */
 export interface I18nConfig {
-  /** Включен ли i18n режим */
+  /** Whether i18n mode is enabled */
   enabled: boolean
-  /** Путь вывода файлов переводов (относительно schema.zmodel) */
+  /** Output path for translation files (relative to schema.zmodel) */
   output: string
-  /** Локаль по умолчанию (из неё берутся значения) */
+  /** Default locale (source of truth — overwritten on each generation) */
   defaultLocale: string
-  /** Список всех локалей */
+  /** List of all locales */
   locales: string[]
+  /** Path to custom validation translations file (optional) */
+  validationTranslationsPath?: string
 }
 
 /**
- * Собранные данные переводов для генерации
+ * Collected translation data for generation.
  */
 export interface I18nTranslations {
-  /** Переводы моделей: { ModelName: { fieldName: { title: '...', placeholder: '...' } } } */
+  /** Model translations: { ModelName: { fieldName: { title: '...', placeholder: '...' } } } */
   models: Record<string, Record<string, Record<string, string>>>
-  /** Переводы enum'ов: { EnumName: { VALUE: { label: '...' } } } */
+  /** Enum translations: { EnumName: { VALUE: { label: '...' } } } */
   enums: Record<string, Record<string, Record<string, string>>>
 }
 
 /**
- * Структура переводов для ошибок валидации Zod
+ * Validation error translations for Zod v4.
  *
- * Ключи соответствуют Zod v4 issue codes.
- * Параметры интерполяции: {minimum}, {maximum}, {expected}, {received}, {options}, {keys}, {message}
+ * Keys correspond to Zod v4 issue codes.
+ * Interpolation params: {minimum}, {maximum}, {expected}, {received}, {options}, {keys}, {message}
  */
 export interface ValidationTranslations {
-  /** invalid_type — неверный тип данных */
+  /** invalid_type — wrong data type */
   invalid_type: string
-  /** required — обязательное поле */
+  /** required — field is required */
   required: string
-  /** too_small — значение меньше минимума */
+  /** too_small — value below minimum */
   too_small: {
     string: string
     number: string
@@ -148,7 +150,7 @@ export interface ValidationTranslations {
     set: string
     file: string
   }
-  /** too_big — значение больше максимума */
+  /** too_big — value above maximum */
   too_big: {
     string: string
     number: string
@@ -157,7 +159,7 @@ export interface ValidationTranslations {
     set: string
     file: string
   }
-  /** invalid_format — невалидный формат строки (Zod v4, ранее invalid_string) */
+  /** invalid_format — invalid string format (Zod v4, formerly invalid_string) */
   invalid_format: {
     email: string
     url: string
@@ -175,18 +177,18 @@ export interface ValidationTranslations {
     lowercase: string
     uppercase: string
   }
-  /** not_multiple_of — число не кратно */
+  /** not_multiple_of — number not a multiple */
   not_multiple_of: string
-  /** unrecognized_keys — неизвестные ключи */
+  /** unrecognized_keys — unknown keys in object */
   unrecognized_keys: string
-  /** invalid_value — невалидное значение (Zod v4, объединяет invalid_enum_value + invalid_literal) */
+  /** invalid_value — invalid value (Zod v4, combines invalid_enum_value + invalid_literal) */
   invalid_value: string
-  /** invalid_union — невалидный union */
+  /** invalid_union — invalid union */
   invalid_union: string
-  /** invalid_key — невалидный ключ */
+  /** invalid_key — invalid key (z.record/z.map) */
   invalid_key: string
-  /** invalid_element — невалидный элемент */
+  /** invalid_element — invalid element (z.map/z.set) */
   invalid_element: string
-  /** custom — кастомная ошибка */
+  /** custom — custom error (.refine, .superRefine) */
   custom: string
 }

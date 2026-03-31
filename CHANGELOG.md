@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.2.0] - 2026-03-31
+
+### Added
+
+- `validationTranslationsPath` plugin option for custom validation translations
+- Built-in validation translations for en and ru as `BUILTIN_TRANSLATIONS`
+- `ValidationTranslations` type exported from package
+- `build:npm` target for npm publishing
+- `README.en.md` with English documentation
+
+### Changed
+
+- Default locale changed from `'ru'` to `'en'`
+- All JSDoc and comments translated to English
+- Generated code comments: `@lena/` → `@letar/`
+- `isRussian` hardcode → extensible `getValidationTranslations()` with fallback chain
+- `README.md` updated: explicit `defaultLocale = 'ru'` for Russian users
+
 ## [1.0.0] - 2026-03-31
 
 ### Features

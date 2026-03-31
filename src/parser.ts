@@ -1,7 +1,7 @@
 import type { FormFieldMeta, ZodConstraints } from './types.js'
 
 /**
- * Имена props, которые являются Zod constraints (а не UI props)
+ * Prop names that are Zod constraints (not UI props).
  */
 const ZOD_CONSTRAINT_NAMES = new Set([
   // Number
@@ -20,33 +20,29 @@ const ZOD_CONSTRAINT_NAMES = new Set([
 ])
 
 /**
- * Извлечь метку из комментария enum значения
+ * Extract label from enum value comment.
  *
- * Поддерживает:
- * - `// Сладкое` (inline комментарий)
- * - `/// Сладкое` (doc комментарий)
- *
- * @param comments Массив комментариев из AST
- * @returns Извлечённая метка или undefined
+ * Supports:
+ * - `// Sweet` (inline comment)
+ * - `/// Sweet` (doc comment)
  */
 export function extractEnumLabel(comments: string[]): string | undefined {
   if (!comments || comments.length === 0) {
     return undefined
   }
 
-  // Берём первый комментарий
   const comment = comments[0]?.trim()
   if (!comment) {
     return undefined
   }
 
-  // Убираем префиксы /// или //
+  // Strip /// or // prefix
   const label = comment.replace(/^\/\/\/?/, '').trim()
   return label || undefined
 }
 
 /**
- * Преобразовать SCREAMING_CASE в Title Case
+ * Convert SCREAMING_CASE to Title Case.
  *
  * @example
  * toTitleCase('SWEET') // 'Sweet'
@@ -61,9 +57,9 @@ export function toTitleCase(str: string): string {
 }
 
 /**
- * Парсить @form.* директивы из комментариев поля
+ * Parse @form.* directives from field comments.
  *
- * Поддерживаемые директивы:
+ * Supported directives:
  * - @form.title("...")
  * - @form.placeholder("...")
  * - @form.description("...")
@@ -71,9 +67,6 @@ export function toTitleCase(str: string): string {
  * - @form.props({...})
  * - @form.relation({...})
  * - @form.exclude
- *
- * @param comments Массив комментариев из AST
- * @returns Распарсенные метаданные формы
  */
 export function parseFormMeta(comments: string[]): FormFieldMeta {
   const meta: FormFieldMeta = {}
@@ -82,7 +75,7 @@ export function parseFormMeta(comments: string[]): FormFieldMeta {
     return meta
   }
 
-  // Объединяем все комментарии в одну строку для парсинга
+  // Join all comments into a single string for parsing
   const allComments = comments.join('\n')
 
   // @form.title("...")
@@ -109,19 +102,19 @@ export function parseFormMeta(comments: string[]): FormFieldMeta {
     meta.fieldType = fieldTypeMatch[1]
   }
 
-  // @form.props({...}) - JS object literal (не строгий JSON)
-  // Разделяем на Zod constraints (min, max, etc.) и UI props (остальные)
+  // @form.props({...}) — JS object literal (not strict JSON)
+  // Split into Zod constraints (min, max, etc.) and UI props (everything else)
   const propsMatch = allComments.match(/@form\.props\((\{[\s\S]*?\})\)/)
   if (propsMatch) {
     try {
-      // Преобразуем JS object literal в валидный JSON:
+      // Convert JS object literal to valid JSON
       const jsonStr = propsMatch[1]
-        .replace(/'/g, '"') // Одинарные кавычки → двойные
+        .replace(/'/g, '"') // Single quotes → double
         .replace(/(\w+)\s*:/g, '"$1":') // key: → "key":
-        .replace(/,\s*}/g, '}') // Убираем trailing comma
+        .replace(/,\s*}/g, '}') // Remove trailing comma
       const allProps = JSON.parse(jsonStr) as Record<string, unknown>
 
-      // Разделяем на constraints и UI props
+      // Separate constraints from UI props
       const constraints: ZodConstraints = {}
       const uiProps: Record<string, unknown> = {}
 
@@ -141,11 +134,11 @@ export function parseFormMeta(comments: string[]): FormFieldMeta {
         meta.props = uiProps
       }
     } catch {
-      // Игнорируем ошибки парсинга
+      // Ignore parse errors
     }
   }
 
-  // @form.relation({...}) - JS object literal
+  // @form.relation({...}) — JS object literal
   const relationMatch = allComments.match(/@form\.relation\((\{[\s\S]*?\})\)/)
   if (relationMatch) {
     try {
@@ -155,7 +148,7 @@ export function parseFormMeta(comments: string[]): FormFieldMeta {
         .replace(/,\s*}/g, '}')
       meta.relation = JSON.parse(jsonStr)
     } catch {
-      // Игнорируем ошибки парсинга
+      // Ignore parse errors
     }
   }
 

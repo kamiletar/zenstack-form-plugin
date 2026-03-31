@@ -3,7 +3,7 @@ import { parseFormMeta } from './parser.js'
 import type { FormFieldMeta, I18nConfig, ModelFieldInfo, ModelInfo, ZodConstraints } from './types.js'
 
 /**
- * Маппинг Prisma типов в Zod типы
+ * Mapping from Prisma types to Zod types.
  */
 const PRISMA_TO_ZOD: Record<string, string> = {
   String: 'z.string()',
@@ -18,28 +18,28 @@ const PRISMA_TO_ZOD: Record<string, string> = {
 }
 
 /**
- * Получить тип поля из AST
+ * Get field type from AST.
  *
- * ZenStack AST структура:
- * - Примитивы (String, Int, Float, etc.): field.type.type = "Int" (строка)
- * - Ссылки (enum, model): field.type.reference.ref.name = "RecipeType"
+ * ZenStack AST structure:
+ * - Primitives (String, Int, etc.): field.type.type = "Int" (string)
+ * - References (enum, model): field.type.reference.ref.name = "RecipeType"
  */
 function getFieldType(field: DataField): string {
   const typeRef = field.type
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const anyType = typeRef as any
 
-  // Для примитивов: anyType.type это строка ("String", "Int", "Float", etc.)
+  // Primitives: anyType.type is a string ("String", "Int", "Float", etc.)
   if (typeof anyType?.type === 'string') {
     return anyType.type
   }
 
-  // Для ссылочных типов (enum, model): anyType.reference?.ref?.name
+  // References (enum, model): anyType.reference?.ref?.name
   if (anyType?.reference?.ref?.name) {
     return anyType.reference.ref.name
   }
 
-  // Fallback через $refText
+  // Fallback via $refText
   if (anyType?.type?.$refText) {
     return anyType.type.$refText
   }
@@ -48,7 +48,7 @@ function getFieldType(field: DataField): string {
 }
 
 /**
- * Проверить, является ли тип enum
+ * Check if field type is an enum.
  */
 function isEnumType(field: DataField, enumNames: Set<string>): boolean {
   const typeName = getFieldType(field)
@@ -56,7 +56,7 @@ function isEnumType(field: DataField, enumNames: Set<string>): boolean {
 }
 
 /**
- * Проверить, является ли поле обязательным
+ * Check if field is required.
  */
 function isRequired(field: DataField): boolean {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,7 +64,7 @@ function isRequired(field: DataField): boolean {
 }
 
 /**
- * Проверить, является ли поле массивом
+ * Check if field is an array.
  */
 function isList(field: DataField): boolean {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -72,7 +72,7 @@ function isList(field: DataField): boolean {
 }
 
 /**
- * Получить значение по умолчанию из атрибутов
+ * Get default value from field attributes.
  */
 function getDefaultValue(field: DataField): unknown | undefined {
   const defaultAttr = field.attributes.find((attr: DataFieldAttribute) => attr.decl?.$refText === '@default')
@@ -88,7 +88,7 @@ function getDefaultValue(field: DataField): unknown | undefined {
     return arg.value.value
   }
   if (arg?.value?.$type === 'NumberLiteral') {
-    // Явно преобразуем в число, т.к. AST может хранить как строку
+    // Explicitly convert to number — AST may store as string
     return Number(arg.value.value)
   }
   if (arg?.value?.$type === 'StringLiteral') {
@@ -99,50 +99,50 @@ function getDefaultValue(field: DataField): unknown | undefined {
 }
 
 /**
- * Проверить, является ли тип ссылкой на модель (а не примитив или enum)
+ * Check if field type is a model reference (not a primitive or enum).
  */
 function isModelReference(field: DataField, enumNames: Set<string>): boolean {
   const typeName = getFieldType(field)
 
-  // Если это примитив Prisma — не модель
+  // Prisma primitive — not a model
   if (PRISMA_TO_ZOD[typeName]) {
     return false
   }
 
-  // Если это enum — не модель
+  // Enum — not a model
   if (enumNames.has(typeName)) {
     return false
   }
 
-  // Всё остальное — ссылка на модель
+  // Everything else is a model reference
   return true
 }
 
 /**
- * Извлечь информацию о модели из AST
+ * Extract model information from AST.
  */
 export function extractModelInfo(model: DataModel, enumNames: Set<string>): ModelInfo {
   const fields: ModelFieldInfo[] = []
   const excludedFields: string[] = []
 
-  // Системные поля, которые всегда исключаются
+  // System fields that are always excluded
   const systemFields = ['id', 'createdAt', 'updatedAt']
 
   for (const field of model.fields) {
     const fieldType = getFieldType(field)
     const formMeta = parseFormMeta(field.comments)
 
-    // Проверяем, нужно ли исключить поле
+    // Check if field should be excluded
     const isSystemField = systemFields.includes(field.name)
     const isId = field.attributes.some((attr: DataFieldAttribute) => attr.decl?.$refText === 'id')
     const hasRelationAttr = field.attributes.some((attr: DataFieldAttribute) => attr.decl?.$refText === 'relation')
     const isModelRef = isModelReference(field, enumNames)
 
-    // Исключаем: системные, id, relation поля, ссылки на модели
-    // НО: если есть @form.relation — оставляем FK поле для select
+    // Exclude: system fields, id, relation fields, model references
+    // BUT: keep FK fields with @form.relation for select rendering
     const hasFormRelation = !!formMeta.relation
-    const shouldExclude =
-      formMeta.exclude || isId || hasRelationAttr || (isModelRef && !hasFormRelation) || isSystemField
+    const shouldExclude = formMeta.exclude || isId || hasRelationAttr || (isModelRef && !hasFormRelation)
+      || isSystemField
 
     if (shouldExclude) {
       excludedFields.push(field.name)
@@ -171,7 +171,7 @@ export function extractModelInfo(model: DataModel, enumNames: Set<string>): Mode
 }
 
 /**
- * Сгенерировать Zod constraints из @form.props
+ * Generate Zod constraints from @form.props.
  */
 function generateConstraints(constraints: ZodConstraints | undefined, prismaType: string): string {
   if (!constraints) {
@@ -225,36 +225,36 @@ function generateConstraints(constraints: ZodConstraints | undefined, prismaType
 }
 
 /**
- * Сгенерировать Zod тип для поля
+ * Generate Zod type for a field.
  */
 function generateZodType(field: ModelFieldInfo, _enumNames: Set<string>): string {
   let zodType: string
 
   if (field.isEnum && field.enumName) {
-    // Используем импортированную enum схему
+    // Use imported enum schema
     zodType = `${field.enumName}FormSchema`
   } else {
-    // Маппим Prisma тип в Zod
+    // Map Prisma type to Zod
     zodType = PRISMA_TO_ZOD[field.type] ?? 'z.string()'
   }
 
-  // Применяем constraints из @form.props (min, max, etc.)
+  // Apply constraints from @form.props (min, max, etc.)
   const constraintsStr = generateConstraints(field.formMeta.constraints, field.type)
   if (constraintsStr) {
     zodType = `${zodType}${constraintsStr}`
   }
 
-  // Массивы
+  // Arrays
   if (field.isList) {
     zodType = `z.array(${zodType})`
   }
 
-  // Опциональные поля (Prisma ? означает nullable, не undefined)
+  // Optional fields (Prisma ? means nullable, not undefined)
   if (!field.isRequired) {
     zodType = `${zodType}.nullable().optional()`
   }
 
-  // Значение по умолчанию
+  // Default value
   if (field.defaultValue !== undefined) {
     let defaultStr: string
     if (typeof field.defaultValue === 'string') {
@@ -262,7 +262,7 @@ function generateZodType(field: ModelFieldInfo, _enumNames: Set<string>): string
     } else if (typeof field.defaultValue === 'boolean') {
       defaultStr = String(field.defaultValue)
     } else if (typeof field.defaultValue === 'number') {
-      // Для BigInt типов нужно использовать BigInt()
+      // BigInt types need BigInt() wrapper
       if (field.type === 'BigInt') {
         defaultStr = `BigInt(${field.defaultValue})`
       } else {
@@ -278,7 +278,7 @@ function generateZodType(field: ModelFieldInfo, _enumNames: Set<string>): string
 }
 
 /**
- * Параметры генерации UI meta
+ * Parameters for UI meta generation.
  */
 interface GenerateUIMetaParams {
   formMeta: FormFieldMeta
@@ -288,7 +288,7 @@ interface GenerateUIMetaParams {
 }
 
 /**
- * Сгенерировать UI meta объект для поля
+ * Generate UI meta object for a field.
  */
 function generateUIMeta(params: GenerateUIMetaParams): string | null {
   const { formMeta, modelName, fieldName, i18nConfig } = params
@@ -313,7 +313,7 @@ function generateUIMeta(params: GenerateUIMetaParams): string | null {
     parts.push(`fieldProps: { relation: ${JSON.stringify(formMeta.relation)} }`)
   }
 
-  // Добавляем i18nKey если i18n включен
+  // Add i18nKey when i18n is enabled
   if (i18nConfig?.enabled) {
     parts.push(`i18nKey: '${modelName}.${fieldName}'`)
   }
@@ -326,16 +326,16 @@ function generateUIMeta(params: GenerateUIMetaParams): string | null {
 }
 
 /**
- * Сгенерировать код для модели
+ * Generate code for a model.
  */
 export function generateModelCode(
   modelInfo: ModelInfo,
   enumNames: Set<string>,
-  i18nConfig: I18nConfig | null = null
+  i18nConfig: I18nConfig | null = null,
 ): string {
   const { name, fields, excludedFields } = modelInfo
 
-  // Собираем импорты enum'ов
+  // Collect enum imports
   const enumImports = new Set<string>()
   for (const field of fields) {
     if (field.isEnum && field.enumName) {
@@ -343,13 +343,13 @@ export function generateModelCode(
     }
   }
 
-  // Генерируем импорты
+  // Generate imports
   const imports = [`import { z } from 'zod/v4'`]
   for (const enumName of enumImports) {
     imports.push(`import { ${enumName}FormSchema } from './enums/${enumName}.form'`)
   }
 
-  // Генерируем поля схемы
+  // Generate schema fields
   const schemaFields: string[] = []
   for (const field of fields) {
     const zodType = generateZodType(field, enumNames)
@@ -369,30 +369,30 @@ export function generateModelCode(
 
   const excludedFieldsStr = excludedFields.map((f) => `'${f}'`).join(', ')
 
-  return `// AUTO-GENERATED by @lena/zenstack-form-plugin
+  return `// AUTO-GENERATED by @letar/zenstack-form-plugin
 // DO NOT EDIT MANUALLY
 
 ${imports.join('\n')}
 
 /**
- * Схема создания ${name} с UI метаданными
+ * Create schema for ${name} with UI metadata.
  */
 export const ${name}CreateFormSchema = z.object({
 ${schemaFields.join(',\n')}
 })
 
 /**
- * Схема обновления ${name} (все поля опциональны)
+ * Update schema for ${name} (all fields optional).
  */
 export const ${name}UpdateFormSchema = ${name}CreateFormSchema.partial()
 
 /**
- * Поля, исключённые из форм
+ * Fields excluded from forms.
  */
 export const ${name}ExcludedFields = [${excludedFieldsStr}] as const
 
 /**
- * Типы
+ * Types.
  */
 export type ${name}CreateForm = z.infer<typeof ${name}CreateFormSchema>
 export type ${name}UpdateForm = z.infer<typeof ${name}UpdateFormSchema>

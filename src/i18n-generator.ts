@@ -2,8 +2,108 @@ import { mkdir, readFile, writeFile } from 'fs/promises'
 import { dirname, join, resolve } from 'path'
 import type { EnumInfo, I18nConfig, I18nTranslations, ModelInfo, ValidationTranslations } from './types.js'
 
+// ─── Built-in validation translations ──────────────────────────────────────────
+
 /**
- * Собрать переводы из моделей
+ * Built-in validation translations.
+ * English and Russian are included out of the box.
+ * For other languages, use the `validationTranslationsPath` plugin option.
+ */
+const BUILTIN_TRANSLATIONS: Record<string, ValidationTranslations> = {
+  en: {
+    invalid_type: 'Expected {expected}, received {received}',
+    required: 'Required field',
+    too_small: {
+      string: 'Minimum {minimum} characters',
+      number: 'Minimum {minimum}',
+      array: 'Minimum {minimum} items',
+      date: 'Date must be after {minimum}',
+      set: 'Minimum {minimum} items',
+      file: 'Minimum file size {minimum}',
+    },
+    too_big: {
+      string: 'Maximum {maximum} characters',
+      number: 'Maximum {maximum}',
+      array: 'Maximum {maximum} items',
+      date: 'Date must be before {maximum}',
+      set: 'Maximum {maximum} items',
+      file: 'Maximum file size {maximum}',
+    },
+    invalid_format: {
+      email: 'Invalid email address',
+      url: 'Invalid URL',
+      uuid: 'Invalid UUID',
+      cuid: 'Invalid CUID',
+      regex: 'Does not match pattern',
+      datetime: 'Invalid datetime',
+      date: 'Invalid date',
+      time: 'Invalid time',
+      ip: 'Invalid IP address',
+      base64: 'Invalid Base64',
+      json_string: 'Invalid JSON',
+      emoji: 'Must contain emoji',
+      jwt: 'Invalid JWT',
+      lowercase: 'Must be lowercase',
+      uppercase: 'Must be uppercase',
+    },
+    not_multiple_of: 'Must be multiple of {multipleOf}',
+    unrecognized_keys: 'Unknown fields: {keys}',
+    invalid_value: 'Invalid value. Expected: {options}',
+    invalid_union: 'Invalid data',
+    invalid_key: 'Invalid key',
+    invalid_element: 'Invalid element',
+    custom: '{message}',
+  },
+  ru: {
+    invalid_type: 'Ожидался тип {expected}, получен {received}',
+    required: 'Обязательное поле',
+    too_small: {
+      string: 'Минимум {minimum} символов',
+      number: 'Минимум {minimum}',
+      array: 'Минимум {minimum} элементов',
+      date: 'Дата должна быть не ранее {minimum}',
+      set: 'Минимум {minimum} элементов',
+      file: 'Минимальный размер файла {minimum}',
+    },
+    too_big: {
+      string: 'Максимум {maximum} символов',
+      number: 'Максимум {maximum}',
+      array: 'Максимум {maximum} элементов',
+      date: 'Дата должна быть не позднее {maximum}',
+      set: 'Максимум {maximum} элементов',
+      file: 'Максимальный размер файла {maximum}',
+    },
+    invalid_format: {
+      email: 'Некорректный email',
+      url: 'Некорректный URL',
+      uuid: 'Некорректный UUID',
+      cuid: 'Некорректный CUID',
+      regex: 'Не соответствует формату',
+      datetime: 'Некорректная дата/время',
+      date: 'Некорректная дата',
+      time: 'Некорректное время',
+      ip: 'Некорректный IP-адрес',
+      base64: 'Некорректный Base64',
+      json_string: 'Некорректный JSON',
+      emoji: 'Должен содержать эмодзи',
+      jwt: 'Некорректный JWT',
+      lowercase: 'Только строчные буквы',
+      uppercase: 'Только заглавные буквы',
+    },
+    not_multiple_of: 'Должно быть кратно {multipleOf}',
+    unrecognized_keys: 'Неизвестные поля: {keys}',
+    invalid_value: 'Недопустимое значение. Ожидается: {options}',
+    invalid_union: 'Невалидные данные',
+    invalid_key: 'Невалидный ключ',
+    invalid_element: 'Невалидный элемент',
+    custom: '{message}',
+  },
+}
+
+// ─── Translation collection ────────────────────────────────────────────────────
+
+/**
+ * Collect translations from model fields.
  */
 export function collectModelTranslations(models: ModelInfo[]): I18nTranslations['models'] {
   const translations: I18nTranslations['models'] = {}
@@ -24,13 +124,11 @@ export function collectModelTranslations(models: ModelInfo[]): I18nTranslations[
         fieldTranslations.description = field.formMeta.description
       }
 
-      // Добавляем только если есть хотя бы одно значение
       if (Object.keys(fieldTranslations).length > 0) {
         modelTranslations[field.name] = fieldTranslations
       }
     }
 
-    // Добавляем модель только если есть поля с переводами
     if (Object.keys(modelTranslations).length > 0) {
       translations[model.name] = modelTranslations
     }
@@ -40,7 +138,7 @@ export function collectModelTranslations(models: ModelInfo[]): I18nTranslations[
 }
 
 /**
- * Собрать переводы из enum'ов
+ * Collect translations from enums.
  */
 export function collectEnumTranslations(enums: EnumInfo[]): I18nTranslations['enums'] {
   const translations: I18nTranslations['enums'] = {}
@@ -58,93 +156,48 @@ export function collectEnumTranslations(enums: EnumInfo[]): I18nTranslations['en
   return translations
 }
 
+// ─── Validation translations ───────────────────────────────────────────────────
+
 /**
- * Генерация переводов для ошибок валидации Zod
- *
- * Структура ключей соответствует Zod v4 issue codes:
- * - validation.{code} — базовый ключ
- * - validation.{code}.{origin} — с указанием типа (string, number, array, date)
- *
- * Параметры интерполяции:
- * - {minimum}, {maximum} — для too_small/too_big
- * - {expected}, {received} — для invalid_type
- * - {options} — для invalid_enum_value
- * - {keys} — для unrecognized_keys
+ * Load custom validation translations from a user-provided file.
+ * The file should export a default Record<string, ValidationTranslations>.
  */
-export function generateValidationTranslations(locale: string): ValidationTranslations {
-  const isRussian = locale === 'ru'
-
-  return {
-    // Обязательное поле (когда undefined/null передан)
-    invalid_type: isRussian
-      ? 'Ожидался тип {expected}, получен {received}'
-      : 'Expected {expected}, received {received}',
-    required: isRussian ? 'Обязательное поле' : 'Required field',
-
-    // Слишком маленькое значение
-    too_small: {
-      string: isRussian ? 'Минимум {minimum} символов' : 'Minimum {minimum} characters',
-      number: isRussian ? 'Минимум {minimum}' : 'Minimum {minimum}',
-      array: isRussian ? 'Минимум {minimum} элементов' : 'Minimum {minimum} items',
-      date: isRussian ? 'Дата должна быть не ранее {minimum}' : 'Date must be after {minimum}',
-      set: isRussian ? 'Минимум {minimum} элементов' : 'Minimum {minimum} items',
-      file: isRussian ? 'Минимальный размер файла {minimum}' : 'Minimum file size {minimum}',
-    },
-
-    // Слишком большое значение
-    too_big: {
-      string: isRussian ? 'Максимум {maximum} символов' : 'Maximum {maximum} characters',
-      number: isRussian ? 'Максимум {maximum}' : 'Maximum {maximum}',
-      array: isRussian ? 'Максимум {maximum} элементов' : 'Maximum {maximum} items',
-      date: isRussian ? 'Дата должна быть не позднее {maximum}' : 'Date must be before {maximum}',
-      set: isRussian ? 'Максимум {maximum} элементов' : 'Maximum {maximum} items',
-      file: isRussian ? 'Максимальный размер файла {maximum}' : 'Maximum file size {maximum}',
-    },
-
-    // Невалидный формат строки (Zod v4: invalid_format, ранее invalid_string)
-    invalid_format: {
-      email: isRussian ? 'Некорректный email' : 'Invalid email address',
-      url: isRussian ? 'Некорректный URL' : 'Invalid URL',
-      uuid: isRussian ? 'Некорректный UUID' : 'Invalid UUID',
-      cuid: isRussian ? 'Некорректный CUID' : 'Invalid CUID',
-      regex: isRussian ? 'Не соответствует формату' : 'Does not match pattern',
-      datetime: isRussian ? 'Некорректная дата/время' : 'Invalid datetime',
-      date: isRussian ? 'Некорректная дата' : 'Invalid date',
-      time: isRussian ? 'Некорректное время' : 'Invalid time',
-      ip: isRussian ? 'Некорректный IP-адрес' : 'Invalid IP address',
-      base64: isRussian ? 'Некорректный Base64' : 'Invalid Base64',
-      json_string: isRussian ? 'Некорректный JSON' : 'Invalid JSON',
-      emoji: isRussian ? 'Должен содержать эмодзи' : 'Must contain emoji',
-      jwt: isRussian ? 'Некорректный JWT' : 'Invalid JWT',
-      lowercase: isRussian ? 'Только строчные буквы' : 'Must be lowercase',
-      uppercase: isRussian ? 'Только заглавные буквы' : 'Must be uppercase',
-    },
-
-    // Число не кратно
-    not_multiple_of: isRussian ? 'Должно быть кратно {multipleOf}' : 'Must be multiple of {multipleOf}',
-
-    // Неизвестные ключи в объекте
-    unrecognized_keys: isRussian ? 'Неизвестные поля: {keys}' : 'Unknown fields: {keys}',
-
-    // Невалидное значение (Zod v4: invalid_value, объединяет invalid_enum_value + invalid_literal)
-    invalid_value: isRussian ? 'Недопустимое значение. Ожидается: {options}' : 'Invalid value. Expected: {options}',
-
-    // Невалидный union
-    invalid_union: isRussian ? 'Невалидные данные' : 'Invalid data',
-
-    // Невалидный ключ (для z.record/z.map)
-    invalid_key: isRussian ? 'Невалидный ключ' : 'Invalid key',
-
-    // Невалидный элемент (для z.map/z.set)
-    invalid_element: isRussian ? 'Невалидный элемент' : 'Invalid element',
-
-    // Кастомная ошибка (.refine, .superRefine)
-    custom: '{message}',
+async function loadCustomTranslations(
+  translationsPath: string,
+  schemaDir: string,
+): Promise<Record<string, ValidationTranslations> | undefined> {
+  try {
+    const fullPath = resolve(schemaDir, translationsPath)
+    const mod = await import(fullPath)
+    return mod.default ?? mod
+  } catch {
+    // eslint-disable-next-line no-console
+    console.warn(`[zenstack-form-plugin] Could not load custom translations from ${translationsPath}`)
+    return undefined
   }
 }
 
 /**
- * Прочитать существующий JSON файл переводов
+ * Get validation translations for a locale.
+ *
+ * Resolution order:
+ * 1. Custom translations (from validationTranslationsPath)
+ * 2. Built-in translations (en, ru)
+ * 3. Fallback to English
+ */
+export function getValidationTranslations(
+  locale: string,
+  customTranslations?: Record<string, ValidationTranslations>,
+): ValidationTranslations {
+  return customTranslations?.[locale]
+    ?? BUILTIN_TRANSLATIONS[locale]
+    ?? BUILTIN_TRANSLATIONS.en
+}
+
+// ─── File utilities ────────────────────────────────────────────────────────────
+
+/**
+ * Read an existing JSON translation file.
  */
 async function readExistingTranslations(filePath: string): Promise<Record<string, unknown> | null> {
   try {
@@ -156,29 +209,26 @@ async function readExistingTranslations(filePath: string): Promise<Record<string
 }
 
 /**
- * Глубокое слияние двух объектов
- * - Новые ключи добавляются с пустыми значениями
- * - Существующие переводы сохраняются
- * - Устаревшие ключи удаляются
+ * Deep merge two objects.
+ * - New keys are added with empty values
+ * - Existing translations are preserved
+ * - Obsolete keys are removed
  */
 function mergeTranslations(
   source: Record<string, unknown>,
-  existing: Record<string, unknown>
+  existing: Record<string, unknown>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(source)) {
     if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      // Рекурсивное слияние для вложенных объектов
       const existingValue = existing[key]
       if (typeof existingValue === 'object' && existingValue !== null && !Array.isArray(existingValue)) {
         result[key] = mergeTranslations(value as Record<string, unknown>, existingValue as Record<string, unknown>)
       } else {
-        // Новый вложенный объект — рекурсивно создаём с пустыми значениями
         result[key] = createEmptyTranslations(value as Record<string, unknown>)
       }
     } else if (typeof value === 'string') {
-      // Для строковых значений: сохраняем существующий перевод или оставляем пустым
       const existingValue = existing[key]
       result[key] = typeof existingValue === 'string' && existingValue !== '' ? existingValue : ''
     }
@@ -188,7 +238,7 @@ function mergeTranslations(
 }
 
 /**
- * Создать объект с пустыми значениями для переводов
+ * Create an object with empty string values (placeholder for translations).
  */
 function createEmptyTranslations(source: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {}
@@ -204,8 +254,10 @@ function createEmptyTranslations(source: Record<string, unknown>): Record<string
   return result
 }
 
+// ─── Key collection for TypeScript types ───────────────────────────────────────
+
 /**
- * Рекурсивно собирает ключи из validation объекта
+ * Recursively collect keys from a validation translations object.
  */
 function collectValidationKeys(obj: Record<string, unknown>, prefix: string): string[] {
   const keys: string[] = []
@@ -223,16 +275,16 @@ function collectValidationKeys(obj: Record<string, unknown>, prefix: string): st
 }
 
 /**
- * Собрать все ключи переводов для генерации типов
+ * Collect all translation keys for TypeScript type generation.
  */
 function collectAllKeys(
   translations: I18nTranslations,
   validationTranslations: ValidationTranslations | null,
-  prefix = ''
+  prefix = '',
 ): string[] {
   const keys: string[] = []
 
-  // Ключи моделей: Product.name.title, Product.name.placeholder, etc.
+  // Model keys: Product.name.title, Product.name.placeholder, etc.
   for (const [modelName, fields] of Object.entries(translations.models)) {
     for (const [fieldName, props] of Object.entries(fields)) {
       for (const propName of Object.keys(props)) {
@@ -241,7 +293,7 @@ function collectAllKeys(
     }
   }
 
-  // Ключи enum'ов: RecipeType.SWEET.label, etc.
+  // Enum keys: RecipeType.SWEET.label, etc.
   for (const [enumName, values] of Object.entries(translations.enums)) {
     for (const [valueName, props] of Object.entries(values)) {
       for (const propName of Object.keys(props)) {
@@ -250,10 +302,10 @@ function collectAllKeys(
     }
   }
 
-  // Ключи валидации: validation.too_small.string, validation.invalid_string.email, etc.
+  // Validation keys: validation.too_small.string, validation.invalid_format.email, etc.
   if (validationTranslations) {
     keys.push(
-      ...collectValidationKeys(validationTranslations as unknown as Record<string, unknown>, `${prefix}validation`)
+      ...collectValidationKeys(validationTranslations as unknown as Record<string, unknown>, `${prefix}validation`),
     )
   }
 
@@ -261,15 +313,15 @@ function collectAllKeys(
 }
 
 /**
- * Сгенерировать TypeScript файл с типами ключей
+ * Generate a TypeScript file with translation key types.
  */
 function generateKeysTypeScript(keys: string[]): string {
   if (keys.length === 0) {
-    return `// AUTO-GENERATED by @lena/zenstack-form-plugin
+    return `// AUTO-GENERATED by @letar/zenstack-form-plugin
 // DO NOT EDIT MANUALLY
 
 /**
- * Все ключи переводов форм (пустой — нет переводов)
+ * All form translation keys (empty — no translations)
  */
 export type FormI18nKey = never
 `
@@ -277,54 +329,60 @@ export type FormI18nKey = never
 
   const keyLiterals = keys.map((k) => `  | '${k}'`).join('\n')
 
-  return `// AUTO-GENERATED by @lena/zenstack-form-plugin
+  return `// AUTO-GENERATED by @letar/zenstack-form-plugin
 // DO NOT EDIT MANUALLY
 
 /**
- * Все ключи переводов форм
+ * All form translation keys.
  *
- * Паттерн:
+ * Pattern:
  * - {ModelName}.{fieldName}.{title|placeholder|description}
  * - {EnumName}.{VALUE}.{label}
- * - validation.{code} — ошибки валидации Zod
- * - validation.{code}.{origin} — ошибки с типом (string, number, array, date)
+ * - validation.{code} — Zod validation errors
+ * - validation.{code}.{origin} — errors with type (string, number, array, date)
  */
 export type FormI18nKey =
 ${keyLiterals}
 
 /**
- * Количество ключей: ${keys.length}
+ * Total key count: ${keys.length}
  */
 export const FORM_I18N_KEY_COUNT = ${keys.length}
 `
 }
 
 /**
- * Записать файл, создав директории при необходимости
+ * Write a file, creating directories as needed.
  */
 async function writeFileWithDir(filePath: string, content: string): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true })
   await writeFile(filePath, content, 'utf-8')
 }
 
+// ─── Main generation ───────────────────────────────────────────────────────────
+
 /**
- * Главная функция генерации i18n файлов
+ * Main function: generate i18n translation files.
  */
 export async function generateI18nFiles(
   translations: I18nTranslations,
   config: I18nConfig,
-  schemaDir: string
+  schemaDir: string,
 ): Promise<void> {
   const outputDir = resolve(schemaDir, config.output)
 
-  // Генерируем файлы для каждой локали
+  // Load custom translations if path is provided
+  const customTranslations = config.validationTranslationsPath
+    ? await loadCustomTranslations(config.validationTranslationsPath, schemaDir)
+    : undefined
+
+  // Generate files for each locale
   for (const locale of config.locales) {
     const filePath = join(outputDir, `${locale}.json`)
 
-    // Генерируем validation переводы для текущей локали
-    const validationTranslations = generateValidationTranslations(locale)
+    const validationTranslations = getValidationTranslations(locale, customTranslations)
 
-    // Объединяем модели, enum'ы и validation в один объект для JSON
+    // Merge models, enums, and validation into a single JSON object
     const fullTranslations: Record<string, unknown> = {
       ...translations.models,
       ...translations.enums,
@@ -332,10 +390,10 @@ export async function generateI18nFiles(
     }
 
     if (locale === config.defaultLocale) {
-      // Для дефолтной локали — полная перезапись
+      // Default locale: full overwrite (source of truth)
       await writeFileWithDir(filePath, JSON.stringify(fullTranslations, null, 2) + '\n')
     } else {
-      // Для остальных локалей — merge стратегия
+      // Other locales: merge strategy (preserves existing translations)
       const existing = await readExistingTranslations(filePath)
       const merged = existing
         ? mergeTranslations(fullTranslations, existing as Record<string, unknown>)
@@ -345,14 +403,14 @@ export async function generateI18nFiles(
     }
   }
 
-  // Генерируем TypeScript файл с типами ключей (используем русские переводы для ключей)
-  const validationForKeys = generateValidationTranslations(config.defaultLocale)
+  // Generate TypeScript key types
+  const validationForKeys = getValidationTranslations(config.defaultLocale, customTranslations)
   const allKeys = collectAllKeys(translations, validationForKeys)
   const keysCode = generateKeysTypeScript(allKeys)
   await writeFileWithDir(join(outputDir, 'keys.ts'), keysCode)
 
   // eslint-disable-next-line no-console
   console.log(
-    `[zenstack-form-plugin] Generated i18n files: ${config.locales.length} locale(s), ${allKeys.length} key(s)`
+    `[zenstack-form-plugin] Generated i18n files: ${config.locales.length} locale(s), ${allKeys.length} key(s)`,
   )
 }
